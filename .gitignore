@@ -94,6 +94,8 @@ runs/*/
 *.json
 !configs/*.yaml
 !schema.json
+!tests/fixtures/*.csv
+!tests/fixtures/*.json
 
 # =========================
 # Logs

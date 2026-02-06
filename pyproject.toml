@@ -1,0 +1,59 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "crowdmind-ml-factory"
+version = "1.0.0"
+description = "External ML training pipeline for CrowdMind - BTS CIEL project"
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+license = {text = "Proprietary"}
+authors = [
+    {name = "CrowdMind Team"}
+]
+keywords = ["machine-learning", "tflite", "embedded", "esp32", "classification"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+    "pandas>=2.0.0",
+    "numpy>=1.26.0",
+    "tensorflow>=2.15.0",
+    "scikit-learn>=1.3.0",
+    "requests>=2.31.0",
+    "pyyaml>=6.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+    "mypy>=1.5.0",
+]
+
+[project.scripts]
+crowdmind-train = "crowdmind_ml.cli.pipeline:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.black]
+line-length = 88
+target-version = ["py311"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+select = ["E", "F", "I", "N", "W"]
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true

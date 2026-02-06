@@ -1,0 +1,42 @@
+# CrowdMind ML Factory - Training Configuration
+# ==============================================
+# This file contains all hyperparameters and model configuration.
+# All values can be overridden; defaults are applied for missing keys.
+
+# Global random seed for reproducibility
+random_seed: 42
+
+# Data splitting configuration
+data:
+  train_ratio: 0.70    # 70% for training
+  val_ratio: 0.15      # 15% for validation
+  test_ratio: 0.15     # 15% for testing
+
+# Model architecture configuration
+model:
+  # Hidden layer sizes (MLP architecture)
+  hidden_layers:
+    - 64
+    - 32
+  
+  # Dropout rate for regularization (0.0 to disable)
+  dropout_rate: 0.2
+  
+  # Activation function for hidden layers
+  activation: "relu"
+
+# Training configuration
+training:
+  # Maximum number of epochs
+  epochs: 100
+  
+  # Batch size for training
+  batch_size: 32
+  
+  # Early stopping patience (epochs without improvement)
+  patience: 10
+
+# TFLite quantization configuration
+quantization:
+  # Number of samples for int8 calibration
+  calibration_samples: 100

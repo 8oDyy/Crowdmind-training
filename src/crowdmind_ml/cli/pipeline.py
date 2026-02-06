@@ -18,41 +18,48 @@ class TrainingPipeline:
     """Orchestrates the complete training pipeline.
     
     Steps:
-    1. Download dataset from API
+    1. Download dataset version from API
     2. Load and validate dataset
     3. Split data deterministically
     4. Preprocess features (fit on train only)
     5. Build and train MLP model
     6. Quantize to TFLite int8
     7. Generate metadata
-    8. Upload model to API
+    8. Upload model version to API
     """
     
     def __init__(
         self,
-        dataset_id: str,
+        dataset_version_id: str,
         config: dict[str, Any],
         api_base: str,
-        api_token: str,
-        runs_dir: Path
+        api_token: str = "",
+        runs_dir: Path = None,
+        model_name: str = None,
+        schema: dict = None
     ) -> None:
         """Initialize the training pipeline.
         
         Args:
-            dataset_id: UUID of the dataset to train on.
+            dataset_version_id: UUID of the dataset version to train on.
             config: Training configuration dictionary.
             api_base: Base URL of the CrowdMind API.
             api_token: Authentication token for API.
             runs_dir: Directory for training run outputs.
+            model_name: Name for the model to create.
+            schema: Dataset schema (features, label_column, labels).
         """
-        self.dataset_id = dataset_id
+        self.dataset_version_id = dataset_version_id
         self.config = config
         self.random_seed = config.get("random_seed", 42)
+        self.model_name = model_name or f"model-{dataset_version_id[:8]}"
+        self.schema = schema or {}
         
         self.api_client = CrowdMindAPIClient(api_base, api_token)
-        self.run_manager = RunManager(runs_dir)
+        self.run_manager = RunManager(runs_dir or Path("runs"))
         
         self._run_dir = None
+        self._model_id = None
     
     def run(self) -> Path:
         """Execute the complete training pipeline.
@@ -66,10 +73,10 @@ class TrainingPipeline:
         logger.info("=" * 60)
         logger.info("CROWDMIND ML FACTORY - Training Pipeline")
         logger.info("=" * 60)
-        logger.info(f"Dataset ID: {self.dataset_id}")
+        logger.info(f"Dataset Version ID: {self.dataset_version_id}")
         logger.info(f"Random seed: {self.random_seed}")
         
-        self._run_dir = self.run_manager.create_run(self.dataset_id)
+        self._run_dir = self.run_manager.create_run(self.dataset_version_id)
         logger.info(f"Run folder: {self._run_dir}")
         
         try:
@@ -100,14 +107,20 @@ class TrainingPipeline:
             raise
     
     def _step_download_dataset(self) -> tuple[Path, Path]:
-        """Step 1: Download dataset from API."""
+        """Step 1: Download dataset version from API."""
         logger.info("-" * 40)
         logger.info("STEP 1: Downloading dataset from API")
         
+        import json
         data_dir = self.run_manager.get_data_dir(self._run_dir)
-        csv_path, schema_path = self.api_client.download_dataset(
-            self.dataset_id, data_dir
+        
+        csv_path = self.api_client.download_dataset_version(
+            self.dataset_version_id, data_dir
         )
+        
+        schema_path = data_dir / "schema.json"
+        schema_path.write_text(json.dumps(self.schema, indent=2))
+        logger.info(f"Schema saved to: {schema_path}")
         
         return csv_path, schema_path
     
@@ -228,7 +241,7 @@ class TrainingPipeline:
         
         generator = MetadataGenerator()
         return generator.generate(
-            dataset_id=self.dataset_id,
+            dataset_id=self.dataset_version_id,
             dataset_hash=dataset_hash,
             num_features=processed_data.num_features,
             label_mapping=self._preprocessor.label_mapping,
@@ -241,12 +254,26 @@ class TrainingPipeline:
         )
     
     def _step_upload_model(self, tflite_path: Path, meta_path: Path) -> None:
-        """Step 10: Upload model to API."""
+        """Step 10: Upload model version to API."""
         logger.info("-" * 40)
         logger.info("STEP 10: Uploading model to API")
         
-        self.api_client.upload_model(
-            self.dataset_id,
-            tflite_path,
-            meta_path
+        import json
+        with open(meta_path, "r") as f:
+            meta = json.load(f)
+        
+        model_version = meta.get("version", "1.0.0")
+        
+        model_info = self.api_client.create_model(
+            name=self.model_name,
+            framework="tflite",
+            description=f"Trained on dataset version {self.dataset_version_id}"
         )
+        self._model_id = model_info["id"]
+        
+        version_info = self.api_client.create_model_version(
+            model_id=self._model_id,
+            version=model_version,
+            file_path=tflite_path
+        )
+        logger.info(f"Model version uploaded: {version_info['id']}")

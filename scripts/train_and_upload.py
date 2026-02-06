@@ -2,21 +2,22 @@
 """CrowdMind ML Factory - Main Training Script.
 
 This script executes the complete training pipeline:
-1. Downloads dataset from API
+1. Downloads dataset version from API
 2. Validates and preprocesses data
 3. Trains MLP model
 4. Quantizes to TFLite int8
-5. Uploads model back to API
+5. Uploads model version to API
 
 Usage:
     python scripts/train_and_upload.py \
-        --dataset-id <uuid> \
+        --dataset-version-id <uuid> \
         --config configs/train.yaml \
         --api-base <api_url> \
-        --token <api_token>
+        --schema-file schema.json
 """
 
 import argparse
+import json
 import logging
 import sys
 from pathlib import Path
@@ -47,10 +48,10 @@ def parse_args() -> argparse.Namespace:
     )
     
     parser.add_argument(
-        "--dataset-id",
+        "--dataset-version-id",
         type=str,
         required=True,
-        help="UUID of the dataset to train on"
+        help="UUID of the dataset version to train on"
     )
     
     parser.add_argument(
@@ -70,8 +71,22 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--token",
         type=str,
+        default="",
+        help="Authentication token for the API (optional)"
+    )
+    
+    parser.add_argument(
+        "--schema-file",
+        type=Path,
         required=True,
-        help="Authentication token for the API"
+        help="Path to the schema JSON file (features, label_column, labels)"
+    )
+    
+    parser.add_argument(
+        "--model-name",
+        type=str,
+        default=None,
+        help="Name for the model to create (auto-generated if not provided)"
     )
     
     parser.add_argument(
@@ -106,20 +121,26 @@ def main() -> int:
     logger.info("=" * 60)
     logger.info("CROWDMIND ML FACTORY")
     logger.info("=" * 60)
-    logger.info(f"Dataset ID: {args.dataset_id}")
+    logger.info(f"Dataset Version ID: {args.dataset_version_id}")
     logger.info(f"Config: {args.config}")
     logger.info(f"API Base: {args.api_base}")
+    logger.info(f"Schema: {args.schema_file}")
     logger.info(f"Runs Dir: {args.runs_dir}")
     
     try:
         config = load_config(args.config)
         
+        with open(args.schema_file, "r") as f:
+            schema = json.load(f)
+        
         pipeline = TrainingPipeline(
-            dataset_id=args.dataset_id,
+            dataset_version_id=args.dataset_version_id,
             config=config,
             api_base=args.api_base,
             api_token=args.token,
-            runs_dir=args.runs_dir
+            runs_dir=args.runs_dir,
+            model_name=args.model_name,
+            schema=schema
         )
         
         run_dir = pipeline.run()
